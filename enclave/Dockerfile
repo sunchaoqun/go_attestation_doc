@@ -19,14 +19,32 @@ RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o attestation-gener
 # 第二阶段：创建运行镜像
 FROM amazonlinux:2
 
-# 添加 AWS Nitro Enclaves 仓库
+# 安装基本工具和 AWS Nitro Enclaves SDK
 RUN amazon-linux-extras enable aws-nitro-enclaves-sdk || true
-RUN yum install -y aws-nitro-enclaves-sdk-c aws-nitro-enclaves-cli || \
+RUN yum install -y aws-nitro-enclaves-sdk-c aws-nitro-enclaves-cli shadow-utils util-linux || \
     (yum install -y shadow-utils util-linux && \
-     echo '#!/bin/bash' > /usr/bin/nitro-cli && \
-     echo 'echo "模拟 nitro-cli 工具"' >> /usr/bin/nitro-cli && \
-     echo 'echo "{\"document\":\"$(echo -n \"模拟的证明文档\" | base64)\"}" > "$3"' >> /usr/bin/nitro-cli && \
-     chmod +x /usr/bin/nitro-cli)
+     echo '#!/bin/bash' > /usr/bin/nsm-cli && \
+     echo 'if [ "$1" = "describe-attestation-doc" ]; then' >> /usr/bin/nsm-cli && \
+     echo '  # 获取 nonce 参数' >> /usr/bin/nsm-cli && \
+     echo '  NONCE="default-nonce"' >> /usr/bin/nsm-cli && \
+     echo '  for ((i=1; i<=$#; i++)); do' >> /usr/bin/nsm-cli && \
+     echo '    if [ "${!i}" = "--nonce" ] && [ $((i+1)) -le $# ]; then' >> /usr/bin/nsm-cli && \
+     echo '      NONCE="${!((i+1))}"' >> /usr/bin/nsm-cli && \
+     echo '      break' >> /usr/bin/nsm-cli && \
+     echo '    fi' >> /usr/bin/nsm-cli && \
+     echo '  done' >> /usr/bin/nsm-cli && \
+     echo '' >> /usr/bin/nsm-cli && \
+     echo '  # 创建模拟的证明文档' >> /usr/bin/nsm-cli && \
+     echo '  DOC_TEXT="这是一个模拟的证明文档，nonce: $NONCE"' >> /usr/bin/nsm-cli && \
+     echo '  DOC_BASE64=$(echo -n "$DOC_TEXT" | base64)' >> /usr/bin/nsm-cli && \
+     echo '' >> /usr/bin/nsm-cli && \
+     echo '  # 输出 JSON 格式的响应' >> /usr/bin/nsm-cli && \
+     echo '  echo "{\"attestation_doc\":\"$DOC_BASE64\"}"' >> /usr/bin/nsm-cli && \
+     echo 'else' >> /usr/bin/nsm-cli && \
+     echo '  echo "用法: nsm-cli describe-attestation-doc [--json] [--nonce VALUE]" >&2' >> /usr/bin/nsm-cli && \
+     echo '  exit 1' >> /usr/bin/nsm-cli && \
+     echo 'fi' >> /usr/bin/nsm-cli && \
+     chmod +x /usr/bin/nsm-cli)
 RUN yum clean all
 
 WORKDIR /app

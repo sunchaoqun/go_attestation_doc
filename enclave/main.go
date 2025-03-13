@@ -257,82 +257,17 @@ func parseAttestationDoc(document string) (map[string]interface{}, error) {
 	return result, nil
 }
 
-// 使用 AWS Nitro CLI 获取真实的证明文档
-func getSignedAttestationDocWithAWSCLI(nonce string) (string, error) {
-	// 检查 nitro-cli 是否可用
-	_, err := exec.LookPath("nitro-cli")
-	if err != nil {
-		return "", fmt.Errorf("nitro-cli 工具不可用: %v", err)
-	}
-
-	// 创建临时文件来存储 nonce
-	nonceFile, err := os.CreateTemp("", "nonce-*.txt")
-	if err != nil {
-		return "", fmt.Errorf("创建临时文件失败: %v", err)
-	}
-	defer os.Remove(nonceFile.Name())
-
-	// 写入 nonce
-	if _, err := nonceFile.WriteString(nonce); err != nil {
-		return "", fmt.Errorf("写入 nonce 失败: %v", err)
-	}
-	nonceFile.Close()
-
-	// 创建临时文件来存储证明文档
-	docFile, err := os.CreateTemp("", "attestation-*.json")
-	if err != nil {
-		return "", fmt.Errorf("创建临时文件失败: %v", err)
-	}
-	defer os.Remove(docFile.Name())
-	docFile.Close()
-
-	// 使用 nitro-cli 获取证明文档
-	cmd := exec.Command("nitro-cli", "get-attestation-document",
-		"--nonce-file", nonceFile.Name(),
-		"--output-file", docFile.Name())
-
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		return "", fmt.Errorf("执行 nitro-cli 失败: %v, 输出: %s", err, output)
-	}
-
-	// 读取证明文档
-	docBytes, err := os.ReadFile(docFile.Name())
-	if err != nil {
-		return "", fmt.Errorf("读取证明文档失败: %v", err)
-	}
-
-	// 尝试解析 JSON
-	var result struct {
-		Document string `json:"document"`
-	}
-	if err := json.Unmarshal(docBytes, &result); err != nil {
-		// 如果解析失败，可能是直接输出了证明文档
-		return base64.StdEncoding.EncodeToString(docBytes), nil
-	}
-
-	return result.Document, nil
-}
-
 // 获取签名的证明文档
 func getSignedAttestationDoc(nonce string) (string, error) {
-	// 首先尝试使用 nitro-cli
-	doc, err := getSignedAttestationDocWithAWSCLI(nonce)
-	if err == nil {
-		return doc, nil
-	}
-
-	log.Printf("使用 nitro-cli 获取证明文档失败: %v，尝试使用 nsm-cli...", err)
-
-	// 然后尝试使用 nsm-cli
-	doc, err = getSignedAttestationDocWithCLI(nonce)
+	// 首先尝试使用 nsm-cli
+	doc, err := getSignedAttestationDocWithCLI(nonce)
 	if err == nil {
 		return doc, nil
 	}
 
 	log.Printf("使用 nsm-cli 获取证明文档失败: %v，尝试直接与 NSM 设备交互...", err)
 
-	// 最后尝试直接与 NSM 设备交互
+	// 然后尝试直接与 NSM 设备交互
 	return getSignedAttestationDocDirect(nonce)
 }
 
