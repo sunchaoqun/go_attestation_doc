@@ -9,6 +9,9 @@ COPY main.go ./
 # 初始化 Go 模块
 RUN go mod init aws-enclave-attestation
 
+# 添加 vsock 依赖
+RUN go get github.com/mdlayher/vsock
+
 # 构建应用
 RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o attestation-generator main.go
 
