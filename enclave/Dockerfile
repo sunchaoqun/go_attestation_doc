@@ -21,8 +21,12 @@ RUN chmod +x attestation-generator
 # 第二阶段：创建最小运行镜像
 FROM alpine:latest
 
-# 安装必要的工具和调试工具
-RUN apk --no-cache add ca-certificates bash procps
+# 安装必要的工具和依赖
+RUN apk --no-cache add ca-certificates bash procps curl
+
+# 安装 nsm-cli 工具
+RUN curl -Lo /usr/bin/nsm-cli https://github.com/aws/aws-nitro-enclaves-cli/raw/main/nsm-tools/nsm-cli && \
+    chmod +x /usr/bin/nsm-cli
 
 WORKDIR /app
 

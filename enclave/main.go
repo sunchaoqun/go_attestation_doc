@@ -83,9 +83,14 @@ func isRunningInEnclave() bool {
 
 // 方法1: 使用 nsm-cli 工具获取签名的证明文档
 func getSignedAttestationDocWithCLI(nonce string) (string, error) {
-	// 在 Nitro Enclave 中，我们使用 nsm-cli 工具来获取证明文档
-	// nsm-cli 是 AWS 提供的与 NSM 设备交互的命令行工具
+	// 检查 nsm-cli 是否可用
+	_, err := exec.LookPath("nsm-cli")
+	if err != nil {
+		log.Println("nsm-cli 工具不可用，尝试直接与 NSM 设备交互...")
+		return getSignedAttestationDocDirect(nonce)
+	}
 
+	// 在 Nitro Enclave 中，我们使用 nsm-cli 工具来获取证明文档
 	var cmd *exec.Cmd
 	if nonce == "" {
 		cmd = exec.Command("nsm-cli", "describe-attestation-doc", "--json")
