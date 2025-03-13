@@ -19,14 +19,11 @@ RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o attestation-gener
 RUN chmod +x attestation-generator
 
 # 第二阶段：创建最小运行镜像
-FROM alpine:latest
+FROM amazonlinux:2
 
 # 安装必要的工具和依赖
-RUN apk --no-cache add ca-certificates bash procps curl
-
-# 安装 nsm-cli 工具
-RUN curl -Lo /usr/bin/nsm-cli https://github.com/aws/aws-nitro-enclaves-cli/raw/main/nsm-tools/nsm-cli && \
-    chmod +x /usr/bin/nsm-cli
+RUN yum install -y aws-nitro-enclaves-cli-devel && \
+    yum clean all
 
 WORKDIR /app
 

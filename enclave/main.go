@@ -98,9 +98,11 @@ func getSignedAttestationDocWithCLI(nonce string) (string, error) {
 		cmd = exec.Command("nsm-cli", "describe-attestation-doc", "--json", "--nonce", nonce)
 	}
 
+	// 尝试执行 nsm-cli
 	output, err := cmd.Output()
 	if err != nil {
-		return "", fmt.Errorf("执行 nsm-cli 失败: %v", err)
+		log.Printf("执行 nsm-cli 失败: %v，尝试直接与 NSM 设备交互...", err)
+		return getSignedAttestationDocDirect(nonce)
 	}
 
 	// 解析 JSON 输出
@@ -109,7 +111,8 @@ func getSignedAttestationDocWithCLI(nonce string) (string, error) {
 	}
 
 	if err := json.Unmarshal(output, &result); err != nil {
-		return "", fmt.Errorf("解析 nsm-cli 输出失败: %v", err)
+		log.Printf("解析 nsm-cli 输出失败: %v，尝试直接与 NSM 设备交互...", err)
+		return getSignedAttestationDocDirect(nonce)
 	}
 
 	return result.AttestationDoc, nil

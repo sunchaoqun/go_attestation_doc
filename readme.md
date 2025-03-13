@@ -26,3 +26,6 @@ aws ec2 describe-instances --instance-ids $INSTANCE_ID --region us-west-2 --quer
 
 
 ./attestation-client --cid 16 --output "my-attestation.bin"
+
+
+nitro-cli terminate-enclave --all
