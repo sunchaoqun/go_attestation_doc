@@ -1,5 +1,7 @@
 sudo yum install golang
 
+go mod tidy
+
 go build -o attestation-client ./host/client.go
 
 
