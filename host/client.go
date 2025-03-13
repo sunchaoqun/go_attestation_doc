@@ -12,28 +12,25 @@ import (
 	"github.com/mdlayher/vsock"
 )
 
-// 命令行参数结构
+// 命令行参数结构 - 与 enclave 端匹配
 type CommandArgs struct {
-	UseCLI     bool   `json:"use_cli"`
-	Nonce      string `json:"nonce"`
-	OutputFile string `json:"output_file"`
-	Parse      bool   `json:"parse"`
+	UserData string `json:"user_data"`
 }
 
-// 响应结构
+// 响应结构 - 与 enclave 端匹配
 type Response struct {
-	Success      bool                   `json:"success"`
-	ErrorMessage string                 `json:"error_message,omitempty"`
-	Document     string                 `json:"document,omitempty"`
-	ParsedDoc    map[string]interface{} `json:"parsed_doc,omitempty"`
+	Success      bool   `json:"success"`
+	ErrorMessage string `json:"error_message,omitempty"`
+	Document     string `json:"document,omitempty"`
 }
 
 // 保存证明文档到文件
 func saveAttestationDoc(document string, filename string) error {
-	// 解码 base64 编码的文档
+	// 尝试解码 base64 编码的文档
 	docBytes, err := base64.StdEncoding.DecodeString(document)
 	if err != nil {
-		return fmt.Errorf("解码证明文档失败: %v", err)
+		// 如果解码失败，直接保存原始内容
+		docBytes = []byte(document)
 	}
 
 	// 写入文件
@@ -48,10 +45,8 @@ func main() {
 	// 定义命令行参数
 	cidFlag := flag.Uint("cid", 16, "Enclave 的 CID")
 	portFlag := flag.Uint("port", 5000, "vsock 端口")
-	useCLIFlag := flag.Bool("cli", false, "使用 nsm-cli 工具获取证明文档")
-	nonceFlag := flag.String("nonce", "random-nonce-value", "用于证明文档的 nonce 值")
+	userDataFlag := flag.String("userdata", "", "用户数据")
 	outputFlag := flag.String("output", "attestation_doc.bin", "输出文件路径")
-	parseFlag := flag.Bool("parse", false, "解析并打印证明文档内容")
 	flag.Parse()
 
 	// 检查 CID
@@ -71,10 +66,7 @@ func main() {
 
 	// 准备参数
 	args := CommandArgs{
-		UseCLI:     *useCLIFlag,
-		Nonce:      *nonceFlag,
-		OutputFile: *outputFlag,
-		Parse:      *parseFlag,
+		UserData: *userDataFlag,
 	}
 
 	// 序列化参数
@@ -119,14 +111,11 @@ func main() {
 		}
 	}
 
-	// 打印证明文档
-	fmt.Println("\n签名证明文档 (base64 编码):")
-	fmt.Println(response.Document)
-
-	// 如果有解析的文档，打印它
-	if response.ParsedDoc != nil {
-		fmt.Println("\n证明文档内容:")
-		jsonBytes, _ := json.MarshalIndent(response.ParsedDoc, "", "  ")
-		fmt.Println(string(jsonBytes))
+	// 打印证明文档摘要
+	fmt.Println("\n证明文档已接收")
+	if len(response.Document) > 100 {
+		fmt.Printf("文档大小: %d 字节, 前100字节: %s...\n", len(response.Document), response.Document[:100])
+	} else {
+		fmt.Printf("文档大小: %d 字节, 内容: %s\n", len(response.Document), response.Document)
 	}
 }

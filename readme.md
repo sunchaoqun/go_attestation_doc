@@ -4,6 +4,7 @@ go mod tidy
 
 go build -o attestation-client ./host/client.go
 
+nitro-cli terminate-enclave --all
 
 # 构建 Docker 镜像
 docker build -t aws-enclave-attestation:latest -f ./enclave/Dockerfile ./enclave
@@ -13,8 +14,6 @@ nitro-cli build-enclave --docker-uri aws-enclave-attestation:latest --output-fil
 
 # 运行 Enclave
 nitro-cli run-enclave --eif-path enclave.eif --enclave-cid 16 --memory 1024 --cpu-count 2 --debug-mode --attach-console
-
-nitro-cli terminate-enclave --all
 
 nitro-cli console --enclave-id $(nitro-cli describe-enclaves | jq -r '.[0].EnclaveID')
 
