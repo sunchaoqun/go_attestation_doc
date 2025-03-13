@@ -15,6 +15,8 @@ import (
 	"strconv"
 	"strings"
 	"unsafe"
+
+	"github.com/mdlayher/vsock"
 )
 
 const (
@@ -313,8 +315,17 @@ func sendErrorResponse(conn net.Conn, errorMessage string) {
 
 // 启动 vsock 服务器
 func startVsockServer() {
-	// 创建 vsock 监听器
-	listener, err := net.Listen("vsock", fmt.Sprintf("vsock://:%d", vsockPort))
+	log.Println("尝试启动 vsock 服务器...")
+
+	// 检查 vsock 设备
+	if _, err := os.Stat("/dev/vsock"); err != nil {
+		log.Printf("警告: 未找到 /dev/vsock 设备: %v", err)
+	} else {
+		log.Println("找到 /dev/vsock 设备")
+	}
+
+	// 使用 mdlayher/vsock 库
+	listener, err := vsock.Listen(vsockPort)
 	if err != nil {
 		log.Fatalf("无法创建 vsock 监听器: %v", err)
 	}
@@ -329,6 +340,8 @@ func startVsockServer() {
 			log.Printf("接受连接失败: %v\n", err)
 			continue
 		}
+
+		log.Printf("接收到新连接: %v\n", conn.RemoteAddr())
 
 		// 为每个连接创建一个 goroutine
 		go handleClient(conn)
