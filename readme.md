@@ -1,3 +1,5 @@
+sudo yum install golang
+
 go build -o attestation-client ./host/client.go
 
 
@@ -12,3 +14,10 @@ nitro-cli run-enclave --eif-path enclave.eif --memory 512 --cpu-count 2 --debug-
 
 # 获取 Enclave 的 CID
 ENCLAVE_CID=$(nitro-cli describe-enclaves | jq -r '.[0].EnclaveID')
+
+
+
+
+export INSTANCE_ID=i-02f8fc047b1c66083
+
+aws ec2 describe-instances --instance-ids $INSTANCE_ID --region us-west-2 --query "Reservations[0].Instances[0].EnclaveOptions"
