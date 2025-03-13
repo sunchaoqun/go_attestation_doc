@@ -25,38 +25,29 @@ FROM amazonlinux:2
 RUN yum install -y shadow-utils util-linux && \
     yum clean all
 
-# 创建 nsm-cli 脚本
-RUN echo '#!/bin/bash\n\
-if [ "$1" = "describe-attestation-doc" ]; then\n\
-  # 获取 nonce 参数\n\
-  NONCE="default-nonce"\n\
-  for ((i=1; i<=$#; i++)); do\n\
-    if [ "${!i}" = "--nonce" ] && [ $((i+1)) -le $# ]; then\n\
-      NONCE="${!((i+1))}"\n\
-      break\n\
-    fi\n\
-  done\n\
-  \n\
-  # 尝试读取 NSM 设备\n\
-  if [ -e /dev/nsm ]; then\n\
-    dd if=/dev/nsm of=/dev/null bs=1 count=1 2>/dev/null || echo "警告: 无法读取 /dev/nsm" >&2\n\
-  else\n\
-    echo "警告: /dev/nsm 设备不存在" >&2\n\
-  fi\n\
-  \n\
-  # 创建模拟的证明文档\n\
-  DOC_TEXT="这是一个模拟的证明文档，nonce: $NONCE"\n\
-  DOC_BASE64=$(echo -n "$DOC_TEXT" | base64)\n\
-  \n\
-  # 输出 JSON 格式的响应\n\
-  echo "{\"attestation_doc\":\"$DOC_BASE64\"}"\n\
-else\n\
-  echo "用法: nsm-cli describe-attestation-doc [--json] [--nonce VALUE]" >&2\n\
-  exit 1\n\
-fi\n' > /usr/bin/nsm-cli
-
-# 设置执行权限
-RUN chmod +x /usr/bin/nsm-cli
+# 创建 nsm-cli 脚本（使用多行 RUN 命令避免转义问题）
+RUN echo '#!/bin/bash' > /usr/bin/nsm-cli && \
+    echo 'if [ "$1" = "describe-attestation-doc" ]; then' >> /usr/bin/nsm-cli && \
+    echo '  # 获取 nonce 参数' >> /usr/bin/nsm-cli && \
+    echo '  NONCE="default-nonce"' >> /usr/bin/nsm-cli && \
+    echo '  for ((i=1; i<=$#; i++)); do' >> /usr/bin/nsm-cli && \
+    echo '    if [ "${!i}" = "--nonce" ] && [ $((i+1)) -le $# ]; then' >> /usr/bin/nsm-cli && \
+    echo '      NONCE="${!((i+1))}"' >> /usr/bin/nsm-cli && \
+    echo '      break' >> /usr/bin/nsm-cli && \
+    echo '    fi' >> /usr/bin/nsm-cli && \
+    echo '  done' >> /usr/bin/nsm-cli && \
+    echo '' >> /usr/bin/nsm-cli && \
+    echo '  # 创建模拟的证明文档' >> /usr/bin/nsm-cli && \
+    echo '  DOC_TEXT="这是一个模拟的证明文档，nonce: $NONCE"' >> /usr/bin/nsm-cli && \
+    echo '  DOC_BASE64=$(echo -n "$DOC_TEXT" | base64)' >> /usr/bin/nsm-cli && \
+    echo '' >> /usr/bin/nsm-cli && \
+    echo '  # 输出 JSON 格式的响应' >> /usr/bin/nsm-cli && \
+    echo '  echo "{\"attestation_doc\":\"$DOC_BASE64\"}"' >> /usr/bin/nsm-cli && \
+    echo 'else' >> /usr/bin/nsm-cli && \
+    echo '  echo "用法: nsm-cli describe-attestation-doc [--json] [--nonce VALUE]" >&2' >> /usr/bin/nsm-cli && \
+    echo '  exit 1' >> /usr/bin/nsm-cli && \
+    echo 'fi' >> /usr/bin/nsm-cli && \
+    chmod +x /usr/bin/nsm-cli
 
 WORKDIR /app
 
