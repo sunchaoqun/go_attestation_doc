@@ -325,7 +325,8 @@ func startVsockServer() {
 	}
 
 	// 使用 mdlayher/vsock 库
-	listener, err := vsock.Listen(vsockPort)
+	// 正确的 Listen 函数调用需要两个参数：端口号和配置
+	listener, err := vsock.Listen(uint32(vsockPort), nil)
 	if err != nil {
 		log.Fatalf("无法创建 vsock 监听器: %v", err)
 	}

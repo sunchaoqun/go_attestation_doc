@@ -7,8 +7,9 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"net"
 	"os"
+
+	"github.com/mdlayher/vsock"
 )
 
 // 命令行参数结构
@@ -45,7 +46,7 @@ func saveAttestationDoc(document string, filename string) error {
 
 func main() {
 	// 定义命令行参数
-	cidFlag := flag.Uint("cid", 0, "Enclave 的 CID")
+	cidFlag := flag.Uint("cid", 16, "Enclave 的 CID")
 	portFlag := flag.Uint("port", 5000, "vsock 端口")
 	useCLIFlag := flag.Bool("cli", false, "使用 nsm-cli 工具获取证明文档")
 	nonceFlag := flag.String("nonce", "random-nonce-value", "用于证明文档的 nonce 值")
@@ -59,8 +60,8 @@ func main() {
 		log.Fatalf("必须指定 Enclave 的 CID")
 	}
 
-	// 连接到 Enclave
-	conn, err := net.Dial("vsock", fmt.Sprintf("vsock://%d:%d", cid, *portFlag))
+	// 连接到 Enclave - 使用 mdlayher/vsock 库
+	conn, err := vsock.Dial(uint32(cid), uint32(*portFlag), nil)
 	if err != nil {
 		log.Fatalf("连接到 Enclave 失败: %v", err)
 	}

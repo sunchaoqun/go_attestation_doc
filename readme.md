@@ -21,3 +21,6 @@ ENCLAVE_CID=$(nitro-cli describe-enclaves | jq -r '.[0].EnclaveID')
 export INSTANCE_ID=i-02f8fc047b1c66083
 
 aws ec2 describe-instances --instance-ids $INSTANCE_ID --region us-west-2 --query "Reservations[0].Instances[0].EnclaveOptions"
+
+
+./attestation-client --cid 16 --output "my-attestation.bin"
