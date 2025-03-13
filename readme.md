@@ -12,7 +12,9 @@ docker build -t aws-enclave-attestation:latest -f ./enclave/Dockerfile ./enclave
 nitro-cli build-enclave --docker-uri aws-enclave-attestation:latest --output-file enclave.eif
 
 # 运行 Enclave
-nitro-cli run-enclave --eif-path enclave.eif --enclave-cid 16 --memory 512 --cpu-count 2 --debug-mode --attach-console
+nitro-cli run-enclave --eif-path enclave.eif --enclave-cid 16 --memory 1024 --cpu-count 2 --debug-mode --attach-console
+
+nitro-cli terminate-enclave --all
 
 # 获取 Enclave 的 CID
 ENCLAVE_CID=$(nitro-cli describe-enclaves | jq -r '.[0].EnclaveID')
@@ -24,8 +26,8 @@ export INSTANCE_ID=i-02f8fc047b1c66083
 
 aws ec2 describe-instances --instance-ids $INSTANCE_ID --region us-west-2 --query "Reservations[0].Instances[0].EnclaveOptions"
 
+nitro-cli console --enclave-id $(nitro-cli describe-enclaves | jq -r '.[0].EnclaveID')
 
 ./attestation-client --cid 16 --output "my-attestation.bin"
 
 
-nitro-cli terminate-enclave --all
