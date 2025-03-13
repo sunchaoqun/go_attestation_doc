@@ -26,14 +26,8 @@ WORKDIR /app
 # 从构建器阶段复制二进制文件
 COPY --from=builder /app/attestation-generator /app/
 
-# 创建启动脚本以便调试
-RUN echo '#!/bin/sh\n\
-echo "Starting application..."\n\
-echo "Current directory: $(pwd)"\n\
-echo "Directory contents:"\n\
-ls -la /app\n\
-echo "Running application:"\n\
-/app/attestation-generator --server\n' > /app/start.sh && chmod +x /app/start.sh
+# 确保可执行文件有执行权限
+RUN chmod +x /app/attestation-generator
 
 # 设置容器启动命令
-ENTRYPOINT ["/app/start.sh"] 
+ENTRYPOINT ["/app/attestation-generator", "--server"] 
