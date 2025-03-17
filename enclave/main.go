@@ -7,8 +7,10 @@ import (
 	"net"
 	"os"
 	"os/exec"
+	"encoding/base64"
 	"github.com/mdlayher/vsock"
 	"github.com/spf13/cobra"
+	"strings"
 )
 
 const (
@@ -18,7 +20,9 @@ const (
 
 // 命令行参数结构
 type CommandArgs struct {
-	UserData string `json:"user_data"`
+	UserData  string `json:"user_data"`
+	PublicKey string `json:"public_key,omitempty"`
+	Nonce     string `json:"nonce,omitempty"`
 }
 
 // 响应结构
@@ -51,16 +55,57 @@ func handleClient(conn net.Conn) {
 	}
 
 	// 使用 nsm-cli 生成证明文档
-	var cmd *exec.Cmd
-	if args.UserData == "" {
-		cmd = exec.Command("nsm-cli", "attest")
-	} else {
-		cmd = exec.Command("nsm-cli", "attest", "--user-data", args.UserData)
+	cmdArgs := []string{"attest"}
+	
+	if args.UserData != "" {
+		// 直接使用 --user-data 参数，不进行 Base64 编码
+		cmdArgs = append(cmdArgs, "--user-data", args.UserData)
 	}
-
-	output, err := cmd.Output()
+	
+	if args.PublicKey != "" {
+		// 创建临时文件存储公钥
+		tmpFile, err := os.CreateTemp("", "pubkey-*.der")
+		if err != nil {
+			log.Printf("创建临时公钥文件失败: %v\n", err)
+			sendErrorResponse(conn, fmt.Sprintf("创建临时公钥文件失败: %v", err))
+			return
+		}
+		defer os.Remove(tmpFile.Name())
+		
+		// 解码 Base64 编码的公钥
+		pubKeyData, err := base64.StdEncoding.DecodeString(args.PublicKey)
+		if err != nil {
+			log.Printf("解码公钥失败: %v\n", err)
+			sendErrorResponse(conn, fmt.Sprintf("解码公钥失败: %v", err))
+			return
+		}
+		
+		if _, err := tmpFile.Write(pubKeyData); err != nil {
+			log.Printf("写入公钥文件失败: %v\n", err)
+			sendErrorResponse(conn, fmt.Sprintf("写入公钥文件失败: %v", err))
+			return
+		}
+		
+		if err := tmpFile.Close(); err != nil {
+			log.Printf("关闭公钥文件失败: %v\n", err)
+			sendErrorResponse(conn, fmt.Sprintf("关闭公钥文件失败: %v", err))
+			return
+		}
+		
+		cmdArgs = append(cmdArgs, "--public-key", tmpFile.Name())
+	}
+	
+	if args.Nonce != "" {
+		// 直接使用 --nonce 参数，不进行 Base64 编码
+		cmdArgs = append(cmdArgs, "--nonce", args.Nonce)
+	}
+	
+	log.Printf("执行命令: nsm-cli %s\n", strings.Join(cmdArgs, " "))
+	
+	cmd := exec.Command("nsm-cli", cmdArgs...)
+	output, err := cmd.CombinedOutput()
 	if err != nil {
-		log.Printf("执行 nsm-cli attest 失败: %v\n", err)
+		log.Printf("执行 nsm-cli attest 失败: %v\n输出: %s\n", err, string(output))
 		sendErrorResponse(conn, fmt.Sprintf("执行 nsm-cli attest 失败: %v", err))
 		return
 	}
@@ -156,19 +201,55 @@ func describePCR(index uint16) {
 	fmt.Println(string(output))
 }
 
-func generateAttestation(userData string) {
-	var cmd *exec.Cmd
-	if userData == "" {
-		cmd = exec.Command("nsm-cli", "attest")
-	} else {
-		cmd = exec.Command("nsm-cli", "attest", "--user-data", userData)
+func generateAttestation(userData string, publicKey string, nonce string) {
+	args := []string{"attest"}
+	
+	if userData != "" {
+		args = append(args, "--user-data", userData)
 	}
 	
-	output, err := cmd.Output()
+	if publicKey != "" {
+		// 创建临时文件存储公钥
+		tmpFile, err := os.CreateTemp("", "pubkey-*.der")
+		if err != nil {
+			fmt.Printf("创建临时公钥文件失败: %v\n", err)
+			return
+		}
+		defer os.Remove(tmpFile.Name())
+		
+		// 解码 Base64 编码的公钥
+		pubKeyData, err := base64.StdEncoding.DecodeString(publicKey)
+		if err != nil {
+			fmt.Printf("解码公钥失败: %v\n", err)
+			return
+		}
+		
+		if _, err := tmpFile.Write(pubKeyData); err != nil {
+			fmt.Printf("写入公钥文件失败: %v\n", err)
+			return
+		}
+		
+		if err := tmpFile.Close(); err != nil {
+			fmt.Printf("关闭公钥文件失败: %v\n", err)
+			return
+		}
+		
+		args = append(args, "--public-key", tmpFile.Name())
+	}
+	
+	if nonce != "" {
+		args = append(args, "--nonce", nonce)
+	}
+	
+	fmt.Printf("执行命令: nsm-cli %s\n", strings.Join(args, " "))
+	
+	cmd := exec.Command("nsm-cli", args...)
+	output, err := cmd.CombinedOutput()
 	if err != nil {
-		fmt.Printf("执行 nsm-cli attest 失败: %v\n", err)
+		fmt.Printf("执行 nsm-cli attest 失败: %v\n输出: %s\n", err, string(output))
 		return
 	}
+	
 	fmt.Println(string(output))
 }
 
@@ -219,10 +300,14 @@ func setupCLI() *cobra.Command {
 		Short: "Create an AttestationDoc and sign it with its private key to ensure authenticity",
 		Run: func(cmd *cobra.Command, args []string) {
 			userData, _ := cmd.Flags().GetString("userdata")
-			generateAttestation(userData)
+			publicKey, _ := cmd.Flags().GetString("public-key")
+			nonce, _ := cmd.Flags().GetString("nonce")
+			generateAttestation(userData, publicKey, nonce)
 		},
 	}
 	attestationCmd.Flags().StringP("userdata", "d", "", "Additional user data")
+	attestationCmd.Flags().StringP("public-key", "p", "", "Public key for attestation")
+	attestationCmd.Flags().StringP("nonce", "n", "", "Nonce for attestation")
 	rootCmd.AddCommand(attestationCmd)
 
 	return rootCmd

@@ -3,18 +3,22 @@ package main
 import (
 	"encoding/base64"
 	"encoding/json"
+	"encoding/pem"
 	"flag"
 	"fmt"
 	"io"
 	"log"
 	"os"
+	"strings"
 
 	"github.com/mdlayher/vsock"
 )
 
 // 命令行参数结构 - 与 enclave 端匹配
 type CommandArgs struct {
-	UserData string `json:"user_data"`
+	UserData  string `json:"user_data"`
+	PublicKey string `json:"public_key,omitempty"`
+	Nonce     string `json:"nonce,omitempty"`
 }
 
 // 响应结构 - 与 enclave 端匹配
@@ -46,6 +50,8 @@ func main() {
 	cidFlag := flag.Uint("cid", 16, "Enclave 的 CID")
 	portFlag := flag.Uint("port", 5000, "vsock 端口")
 	userDataFlag := flag.String("userdata", "", "用户数据")
+	publicKeyFlag := flag.String("public-key", "", "公钥文件路径")
+	nonceFlag := flag.String("nonce", "", "随机数")
 	outputFlag := flag.String("output", "attestation_doc.bin", "输出文件路径")
 	flag.Parse()
 
@@ -64,9 +70,36 @@ func main() {
 
 	log.Printf("已连接到 Enclave (CID: %d)\n", cid)
 
+	// 读取公钥文件（如果提供）
+	var publicKeyContent string
+	if *publicKeyFlag != "" {
+		pkData, err := os.ReadFile(*publicKeyFlag)
+		if err != nil {
+			log.Fatalf("读取公钥文件失败: %v", err)
+		}
+		
+		// 处理 PEM 格式的公钥
+		pemContent := string(pkData)
+		if strings.Contains(pemContent, "-----BEGIN PUBLIC KEY-----") {
+			// 提取 PEM 中的 Base64 编码部分并解码为 DER 格式
+			pemBlock, _ := pem.Decode(pkData)
+			if pemBlock == nil {
+				log.Fatalf("解析 PEM 格式公钥失败")
+			}
+			
+			// 重新编码为 Base64 以便传输
+			publicKeyContent = base64.StdEncoding.EncodeToString(pemBlock.Bytes)
+		} else {
+			// 如果不是 PEM 格式，假设是 DER 格式，直接进行 Base64 编码
+			publicKeyContent = base64.StdEncoding.EncodeToString(pkData)
+		}
+	}
+
 	// 准备参数
 	args := CommandArgs{
-		UserData: *userDataFlag,
+		UserData:  *userDataFlag,
+		PublicKey: publicKeyContent,
+		Nonce:     *nonceFlag,
 	}
 
 	// 序列化参数
